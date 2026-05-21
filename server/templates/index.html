@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>运维哨兵 - 日志源监控</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        :root {
+            --page-bg: #eef2f6;
+            --panel: #ffffff;
+            --panel-muted: #f8fafc;
+            --line: #d8dee8;
+            --text-main: #172033;
+            --text-soft: #657083;
+            --brand: #2454a6;
+            --ok: #16834a;
+            --bad: #c93535;
+            --warn: #bf7a16;
+        }
+        body {
+            background: var(--page-bg);
+            color: var(--text-main);
+            font-family: "Segoe UI", "Microsoft YaHei", Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 14px;
+        }
+        .topbar {
+            background: #111827;
+            border-bottom: 1px solid rgba(255,255,255,0.08);
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
+        }
+        .brand-block { line-height: 1.1; }
+        .brand-title { font-size: 1rem; font-weight: 700; letter-spacing: 0; }
+        .brand-subtitle { color: rgba(255,255,255,0.54); font-size: 0.74rem; margin-top: 0.2rem; }
+        .toolbar-input { width: min(420px, 88vw); background: #0f172a; border-color: #334155; color: #f8fafc; }
+        .toolbar-input:focus { background: #111827; color: #fff; border-color: #7aa2df; box-shadow: 0 0 0 0.15rem rgba(122,162,223,0.18); }
+        .dashboard-shell { padding-top: 0.85rem; padding-bottom: 1.25rem; }
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(30, 41, 59, 0.06);
+        }
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 0.9rem;
+            border-bottom: 1px solid var(--line);
+            background: var(--panel-muted);
+            border-radius: 8px 8px 0 0;
+            font-weight: 700;
+        }
+        .server-card { border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 8px 24px rgba(30,41,59,0.06); margin-bottom: 1rem; }
+        .server-card .card-body { padding: 1rem; }
+        .server-title { font-size: 1.05rem; font-weight: 750; margin: 0; }
+        .status-dot { height: 9px; width: 9px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+        .bg-running { background-color: var(--ok); box-shadow: 0 0 0 3px rgba(22,131,74,0.12); }
+        .bg-stopped { background-color: var(--bad); box-shadow: 0 0 0 3px rgba(201,53,53,0.14); animation: blink 1s infinite; }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+        .overview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 0.75rem;
+            margin-bottom: 0.85rem;
+        }
+        .kpi-card {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 0.78rem 0.85rem;
+            min-height: 86px;
+            box-shadow: 0 8px 24px rgba(30,41,59,0.055);
+        }
+        .kpi-label { color: var(--text-soft); font-size: 0.74rem; font-weight: 650; }
+        .kpi-value { font-size: 1.65rem; font-weight: 760; line-height: 1.05; margin-top: 0.35rem; }
+        .kpi-note { color: var(--text-soft); font-size: 0.72rem; margin-top: 0.35rem; }
+        .kpi-card.bad .kpi-value { color: var(--bad); }
+        .kpi-card.warn .kpi-value { color: var(--warn); }
+        .kpi-card.ok .kpi-value { color: var(--ok); }
+        #log-terminal {
+            background-color: #111827; color: #d7deea;
+            min-height: 400px; max-height: 560px; overflow-y: auto; border-radius: 0 0 8px 8px;
+            font-family: 'Cascadia Code', 'Courier New', monospace;
+            padding: 0.9rem; font-size: 0.8rem; line-height: 1.55;
+            border-top: 1px solid #263246;
+        }
+        .log-item { border-left: 3px solid #e25555; padding: 0.55rem 0.7rem; margin-bottom: 0.7rem; background: rgba(226,85,85,0.08); border-radius: 0 6px 6px 0; }
+        .log-meta { color: #8db9ff; font-weight: 700; margin-bottom: 0.35rem; }
+        .log-content { color: #f0b8a8; white-space: pre-wrap; word-break: break-word; }
+        .chart-container { height: 148px; width: 100%; }
+        .metric-strip {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(90px, 1fr));
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 0.8rem;
+        }
+        .metric-cell { background: var(--panel-muted); padding: 0.65rem; text-align: center; border-right: 1px solid var(--line); }
+        .metric-cell:last-child { border-right: 0; }
+        .metric-label { color: var(--text-soft); font-size: 0.72rem; }
+        .metric-value { font-weight: 760; margin-top: 0.18rem; }
+        /* 日志源数量变化时自动换列，二三十条也能铺开 */
+        .sources-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(235px, 1fr));
+            gap: 0.6rem;
+        }
+        .source-pill {
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 0.5rem 0.65rem;
+            background: var(--panel-muted);
+            font-size: 0.8rem;
+        }
+        .source-pill .path { color: #6c757d; font-size: 0.72rem; word-break: break-all; }
+        .resource-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 0.5rem;
+        }
+        .resource-tile {
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: var(--panel-muted);
+            padding: 0.5rem 0.65rem;
+            font-size: 0.8rem;
+            min-height: 72px;
+        }
+        .resource-title { font-weight: 600; word-break: break-word; }
+        .resource-subtitle { color: #6c757d; font-size: 0.72rem; word-break: break-word; }
+        .port-ok { border-color: rgba(22,131,74,0.45) !important; color: #145a36; }
+        .port-bad { border-color: rgba(201,53,53,0.5) !important; color: #842029; background: #fff7f7; }
+        .section-label { color: var(--text-soft); font-size: 0.72rem; font-weight: 750; letter-spacing: 0; margin-bottom: 0.42rem; }
+        .soft-divider { border-color: var(--line); opacity: 1; margin: 0.9rem 0; }
+        .config-badge { max-width: min(680px, 100%); white-space: normal; text-align: left; }
+        #trend-chart { width: 100%; min-height: 220px; }
+    </style>
+</head>
+<body>
+
+<nav class="navbar navbar-dark topbar">
+    <div class="container-fluid flex-wrap gap-2">
+        <div class="navbar-brand mb-0 brand-block">
+            <div class="brand-title">智能化运维监控哨兵</div>
+            <div class="brand-subtitle">Agent 状态 · 端口探测 · 异常日志</div>
+        </div>
+        <div class="d-flex flex-wrap align-items-center gap-2 ms-auto">
+            <label class="text-secondary small mb-0">监控服务地址</label>
+            <input type="text" class="form-control form-control-sm toolbar-input"
+                   id="api-base" placeholder="留空=当前页同源，例如 http://192.168.1.10:5000"
+                   title="Flask 服务根地址，保存后写入本地">
+            <button type="button" class="btn btn-sm btn-primary" id="btn-save-base">保存</button>
+            <span class="text-light opacity-50 small" id="last-update">更新: --:--:--</span>
+        </div>
+    </div>
+</nav>
+
+<div class="container-fluid px-3 dashboard-shell">
+    <div class="overview-grid" id="overview-strip"></div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-lg-4">
+            <div class="panel h-100">
+                <div class="panel-header">异常聚合统计</div>
+                <div class="card-body py-2 small" id="stats-summary">暂无数据</div>
+            </div>
+        </div>
+        <div class="col-lg-8">
+            <div class="panel h-100">
+                <div class="panel-header">最近错误趋势（按分钟）</div>
+                <div class="card-body py-1"><div id="trend-chart"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-lg-5">
+            <div class="panel h-100">
+                <div class="panel-header">接收端监控列表</div>
+                <div class="card-body py-2 small" id="monitored-summary">暂无监控列表</div>
+            </div>
+        </div>
+        <div class="col-lg-7">
+            <div class="panel h-100">
+                <div class="panel-header">最近预警</div>
+                <div class="card-body py-2 small" id="alerts-summary">暂无预警</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+        <div class="col-12">
+            <div class="panel">
+                <div class="panel-header">Webhook 转发结果</div>
+                <div class="card-body py-2 small" id="webhook-summary">暂无转发记录</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3" id="server-container"></div>
+
+    <div class="row mt-3">
+        <div class="col-12">
+            <div class="panel">
+                <div class="panel-header bg-dark text-white flex-wrap">
+                    <span>实时异常日志</span>
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <label class="small mb-0 text-white-50">主机</label>
+                        <select class="form-select form-select-sm" id="filter-host" style="width: auto; min-width: 140px;">
+                            <option value="">全部</option>
+                        </select>
+                        <label class="small mb-0 text-white-50">服务名</label>
+                        <select class="form-select form-select-sm" id="filter-service" style="width: auto; min-width: 140px;">
+                            <option value="">全部</option>
+                        </select>
+                        <label class="small mb-0 text-white-50">日志源</label>
+                        <select class="form-select form-select-sm" id="filter-source" style="width: auto; min-width: 160px;">
+                            <option value="">全部</option>
+                        </select>
+                        <button type="button" class="btn btn-sm btn-outline-light" id="btn-clear-log">清空屏幕</button>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div id="log-terminal">等待 Agent 上报或在 YAML 中配置 log_sources…</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const LS_KEY = 'ops_monitor_api_base';
+    let charts = {};
+    let trendChart = null;
+    let lastLogs = [];
+    let lastServers = {};
+
+    function apiRoot() {
+        const raw = document.getElementById('api-base').value.trim();
+        return raw.replace(/\/$/, '') || '';
+    }
+
+    function statusUrl() {
+        const r = apiRoot();
+        return r ? `${r}/api/status` : '/api/status';
+    }
+
+    function escapeHtml(s) {
+        if (s == null) return '';
+        return String(s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function domKey(s) {
+        return String(s || 'x').replace(/[^a-zA-Z0-9_-]/g, '-');
+    }
+
+    function serviceCatalogForHost(host) {
+        return (lastServers[host] && lastServers[host].service_catalog) || {};
+    }
+
+    function displayService(host, serviceKey, fallback) {
+        if (!serviceKey) return fallback || '';
+        const svc = serviceCatalogForHost(host)[serviceKey] || {};
+        return svc.name || fallback || serviceKey;
+    }
+
+    function collectServiceKeys() {
+        const keys = new Set();
+        lastLogs.forEach(l => { if (l.service_key) keys.add(l.service_key); });
+        Object.values(lastServers).forEach(info => {
+            Object.keys(info.service_catalog || {}).forEach(k => keys.add(k));
+            Object.keys(info.processes || {}).forEach(k => keys.add(k));
+            (info.log_sources || []).forEach(s => { if (s.service_key) keys.add(s.service_key); });
+            (info.port_checks || []).forEach(p => { if (p.service_key) keys.add(p.service_key); });
+        });
+        return [...keys].sort();
+    }
+
+    function countPortChecks(info) {
+        const structured = info.port_checks || [];
+        if (structured.length) {
+            return {
+                total: structured.length,
+                bad: structured.filter(p => !p.ok).length
+            };
+        }
+        const legacy = info.ports || {};
+        const keys = Object.keys(legacy);
+        return {
+            total: keys.length,
+            bad: keys.filter(k => !legacy[k]).length
+        };
+    }
+
+    function renderOverview(stats) {
+        const el = document.getElementById('overview-strip');
+        const hosts = Object.keys(lastServers);
+        let sourceCount = 0;
+        let watcherCount = 0;
+        let portTotal = 0;
+        let portBad = 0;
+
+        hosts.forEach(host => {
+            const info = lastServers[host] || {};
+            sourceCount += (info.log_sources || []).length;
+            watcherCount += Number(info.watcher_count || 0);
+            const pc = countPortChecks(info);
+            portTotal += pc.total;
+            portBad += pc.bad;
+        });
+
+        const totalErrors = (stats && stats.total) || 0;
+        const statusClass = portBad > 0 ? 'bad' : (portTotal > 0 ? 'ok' : '');
+        el.innerHTML = `
+            <div class="kpi-card">
+                <div class="kpi-label">在线主机</div>
+                <div class="kpi-value">${hosts.length}</div>
+                <div class="kpi-note">当前上报 Agent</div>
+            </div>
+            <div class="kpi-card ${statusClass}">
+                <div class="kpi-label">端口异常</div>
+                <div class="kpi-value">${portBad}</div>
+                <div class="kpi-note">共 ${portTotal} 个探测项</div>
+            </div>
+            <div class="kpi-card">
+                <div class="kpi-label">日志源</div>
+                <div class="kpi-value">${sourceCount}</div>
+                <div class="kpi-note">tail 线程 ${watcherCount}</div>
+            </div>
+            <div class="kpi-card ${totalErrors ? 'warn' : 'ok'}">
+                <div class="kpi-label">累计异常</div>
+                <div class="kpi-value">${totalErrors}</div>
+                <div class="kpi-note">按去重后的异常块统计</div>
+            </div>`;
+    }
+
+    function initOrUpdateChart(hostname, cpuData, memData) {
+        const chartId = `chart-${domKey(hostname)}`;
+        const chartDom = document.getElementById(chartId);
+        if (!chartDom) return;
+        if (!charts[chartId] || charts[chartId].getDom() !== chartDom) {
+            if (charts[chartId]) charts[chartId].dispose();
+            charts[chartId] = echarts.init(chartDom);
+        }
+        const cpu = cpuData && cpuData.length ? cpuData : [0];
+        const mem = memData && memData.length ? memData : [0];
+        charts[chartId].setOption({
+            grid: { top: 10, bottom: 20, left: 30, right: 10 },
+            xAxis: { type: 'category', show: false },
+            yAxis: { type: 'value', max: 100, splitLine: { show: false } },
+            series: [
+                { name: 'CPU', data: cpu, type: 'line', smooth: true, areaStyle: { opacity: 0.1 }, itemStyle: { color: '#5470c6' } },
+                { name: 'MEM', data: mem, type: 'line', smooth: true, areaStyle: { opacity: 0.1 }, itemStyle: { color: '#91cc75' } }
+            ]
+        });
+    }
+
+    function minuteToLabel(ts) {
+        const d = new Date(ts * 60000);
+        return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+    }
+
+    function renderStatsPanel(stats) {
+        const el = document.getElementById('stats-summary');
+        if (!stats || !stats.total) {
+            el.textContent = '暂无异常上报';
+            return;
+        }
+        const svc = stats.by_service || {};
+        const top = Object.entries(svc).sort((a, b) => b[1] - a[1]).slice(0, 8);
+        el.innerHTML = `<div class="mb-2">累计异常块数：<strong>${stats.total}</strong></div>` +
+            '<table class="table table-sm mb-0"><thead><tr><th>服务名</th><th>次数</th></tr></thead><tbody>' +
+            top.map(([k, v]) => `<tr><td><code>${escapeHtml(k)}</code></td><td>${v}</td></tr>`).join('') +
+            '</tbody></table>';
+    }
+
+    function renderMonitoredPanel(rows) {
+        const el = document.getElementById('monitored-summary');
+        if (!rows || !rows.length) {
+            el.textContent = '暂无监控列表';
+            return;
+        }
+        const cls = { ok: 'text-success', stale: 'text-warning', missing: 'text-danger' };
+        el.innerHTML = '<table class="table table-sm mb-0"><thead><tr><th>主机</th><th>状态</th><th>最后上报</th></tr></thead><tbody>' +
+            rows.map(r => {
+                const age = r.age_seconds == null ? '-' : `${r.age_seconds}s`;
+                return `<tr>
+                    <td><code>${escapeHtml(r.hostname)}</code><div class="text-muted">${escapeHtml(r.server_ip || '')}</div></td>
+                    <td class="${cls[r.status] || ''}">${escapeHtml(r.status)}</td>
+                    <td>${escapeHtml(age)}</td>
+                </tr>`;
+            }).join('') +
+            '</tbody></table>';
+    }
+
+    function renderAlertsPanel(alerts) {
+        const el = document.getElementById('alerts-summary');
+        const rows = (alerts || []).slice(0, 8);
+        if (!rows.length) {
+            el.textContent = '暂无预警';
+            return;
+        }
+        el.innerHTML = '<div class="d-grid gap-2">' + rows.map(a => {
+            const sev = a.severity === 'critical' ? 'danger' : (a.severity === 'warning' ? 'warning' : 'secondary');
+            const at = a.received_at ? new Date(a.received_at * 1000).toLocaleTimeString() : '';
+            return `<div class="border rounded px-2 py-1 bg-light">
+                <div class="d-flex justify-content-between gap-2">
+                    <strong>${escapeHtml(a.type || 'alert')}</strong>
+                    <span class="badge bg-${sev}">${escapeHtml(a.status || '')}</span>
+                </div>
+                <div>${escapeHtml(a.message || '')}</div>
+                <div class="text-muted">${escapeHtml(a.hostname || '')} ${escapeHtml(a.server_ip || '')} ${escapeHtml(at)}</div>
+            </div>`;
+        }).join('') + '</div>';
+    }
+
+    function renderWebhookPanel(deliveries, queueSize) {
+        const el = document.getElementById('webhook-summary');
+        const rows = (deliveries || []).slice(0, 8);
+        if (!rows.length) {
+            el.textContent = `暂无转发记录，队列 ${queueSize || 0}`;
+            return;
+        }
+        const badge = { success: 'success', failed: 'danger', pending: 'secondary' };
+        el.innerHTML = `<div class="text-muted mb-2">当前队列 ${escapeHtml(queueSize || 0)}</div>` +
+            '<table class="table table-sm mb-0"><thead><tr><th>路由</th><th>状态</th><th>目标</th><th>响应</th></tr></thead><tbody>' +
+            rows.map(d => {
+                const status = d.status || 'pending';
+                const target = d.target_url || '';
+                const shortTarget = target.length > 72 ? target.slice(0, 69) + '...' : target;
+                const resp = d.response_status ? String(d.response_status) : (d.last_error || '-');
+                return `<tr>
+                    <td><code>${escapeHtml(d.route_name || '')}</code></td>
+                    <td><span class="badge bg-${badge[status] || 'secondary'}">${escapeHtml(status)}</span></td>
+                    <td title="${escapeHtml(target)}">${escapeHtml(shortTarget)}</td>
+                    <td>${escapeHtml(resp)}</td>
+                </tr>`;
+            }).join('') +
+            '</tbody></table>';
+    }
+
+    function renderTrendChart(stats) {
+        const dom = document.getElementById('trend-chart');
+        if (!dom) return;
+        const raw = (stats && stats.trend) ? stats.trend : [];
+        const xs = raw.map(x => minuteToLabel(x.minute));
+        const ys = raw.map(x => x.count);
+        if (!trendChart) trendChart = echarts.init(dom);
+        trendChart.setOption({
+            grid: { left: 40, right: 12, top: 20, bottom: 28 },
+            xAxis: { type: 'category', data: xs, axisLabel: { rotate: 35, fontSize: 10 } },
+            yAxis: { type: 'value', minInterval: 1 },
+            series: [{ type: 'bar', data: ys, itemStyle: { color: '#e67e22' } }]
+        });
+    }
+
+    function rebuildServiceFilter(stats) {
+        const sel = document.getElementById('filter-service');
+        const cur = sel.value;
+        const svc = collectServiceKeys();
+        sel.innerHTML = '<option value="">全部</option>';
+        svc.sort().forEach(k => {
+            const o = document.createElement('option');
+            o.value = k;
+            o.textContent = k;
+            sel.appendChild(o);
+        });
+        if (svc.includes(cur)) sel.value = cur;
+    }
+
+    function rebuildSourceFilter() {
+        const sel = document.getElementById('filter-source');
+        const hostSel = document.getElementById('filter-host').value;
+        const ids = new Set();
+        Object.keys(lastServers).forEach(host => {
+            if (hostSel && host !== hostSel) return;
+            const ls = lastServers[host].log_sources;
+            if (!Array.isArray(ls)) return;
+            ls.forEach(s => { if (s.id) ids.add(s.id); });
+        });
+        const cur = sel.value;
+        sel.innerHTML = '<option value="">全部</option>';
+        [...ids].sort().forEach(id => {
+            const opt = document.createElement('option');
+            opt.value = id;
+            opt.textContent = id;
+            sel.appendChild(opt);
+        });
+        if ([...ids].includes(cur)) sel.value = cur;
+    }
+
+    function renderLogs() {
+        const hostF = document.getElementById('filter-host').value;
+        const srcF = document.getElementById('filter-source').value;
+        const svcF = document.getElementById('filter-service').value;
+        const terminal = document.getElementById('log-terminal');
+        const rows = lastLogs.filter(l => {
+            if (hostF && l.hostname !== hostF) return false;
+            if (srcF && l.source_id !== srcF) return false;
+            if (svcF && (l.service_key || '') !== svcF) return false;
+            return true;
+        });
+        if (rows.length === 0) {
+            terminal.textContent = '（无匹配日志，可调整筛选或等待 Agent）';
+            return;
+        }
+        terminal.innerHTML = rows.map(l => {
+            const src = l.source_name || l.source_id || '-';
+            const sk = l.service_key ? ` · 服务 ${escapeHtml(l.service_key)}` : '';
+            const file = l.log_file ? ` / ${escapeHtml(l.log_file)}` : '';
+            return `
+            <div class="log-item">
+                <div class="log-meta">[${escapeHtml(l.time)}] ${escapeHtml(l.hostname)} · ${escapeHtml(src)}${sk}${file}</div>
+                <div class="log-content">${escapeHtml(l.content)}</div>
+            </div>`;
+        }).join('');
+    }
+
+    function updateDashboard() {
+        fetch(statusUrl())
+            .then(res => {
+                if (!res.ok) throw new Error(res.statusText);
+                return res.json();
+            })
+            .then(data => {
+                document.getElementById('last-update').textContent = '更新: ' + new Date().toLocaleTimeString();
+                lastLogs = data.logs || [];
+                lastServers = data.servers || {};
+                const stats = data.stats || {};
+                renderOverview(stats);
+                renderStatsPanel(stats);
+                renderMonitoredPanel(data.monitored || []);
+                renderAlertsPanel(data.alerts || []);
+                renderWebhookPanel(data.webhook_deliveries || [], data.webhook_queue_size || 0);
+                renderTrendChart(stats);
+                rebuildServiceFilter(stats);
+
+                const container = document.getElementById('server-container');
+                const hosts = Object.keys(data.servers || {});
+
+                const seenHosts = new Set(hosts);
+                container.querySelectorAll('[id^="col-"]').forEach(el => {
+                    const oldHost = el.dataset.host || el.id.slice(4);
+                    if (!seenHosts.has(oldHost)) {
+                        const chartId = `chart-${domKey(oldHost)}`;
+                        if (charts[chartId]) {
+                            charts[chartId].dispose();
+                            delete charts[chartId];
+                        }
+                        el.remove();
+                    }
+                });
+
+                const hostSelect = document.getElementById('filter-host');
+                const prevHost = hostSelect.value;
+                hostSelect.innerHTML = '<option value="">全部</option>';
+                hosts.forEach(h => {
+                    const o = document.createElement('option');
+                    o.value = h;
+                    o.textContent = h;
+                    hostSelect.appendChild(o);
+                });
+                if (hosts.includes(prevHost)) hostSelect.value = prevHost;
+
+                hosts.forEach(host => {
+                    const info = data.servers[host];
+                    const metrics = info.metrics || {};
+                    const processes = info.processes || {};
+                    const sources = info.log_sources || [];
+                    const portChecks = info.port_checks || [];
+                    const watcherCount = info.watcher_count;
+                    const hostKey = domKey(host);
+                    const chartId = `chart-${hostKey}`;
+
+                    let col = document.getElementById(`col-${hostKey}`);
+                    if (!col) {
+                        col = document.createElement('div');
+                        col.className = 'col-12';
+                        col.id = `col-${hostKey}`;
+                        col.dataset.host = host;
+                        container.appendChild(col);
+                    }
+
+                    const sourceCells = sources.map(s => {
+                        const files = (s.watch_files || []).length;
+                        const pathShort = (s.path || '').length > 80 ? (s.path.slice(0, 77) + '…') : (s.path || '');
+                        const globsStr = Array.isArray(s.globs) && s.globs.length
+                            ? s.globs.join(', ')
+                            : (s.glob || '*.log');
+                        const label = displayService(host, s.service_key, s.service_name);
+                        const product = s.product_line ? `<div class="resource-subtitle">产品线：${escapeHtml(s.product_line)}</div>` : '';
+                        const sk = s.service_key ? `<div class="text-primary small">${escapeHtml(label)} <code>${escapeHtml(s.service_key)}</code></div>` : '';
+                        return `
+                        <div class="source-pill">
+                            <div class="fw-semibold">${escapeHtml(s.name || s.id)}</div>
+                            ${sk}
+                            ${product}
+                            <div class="text-muted"><code>${escapeHtml(s.id)}</code> · 监听 ${files} 个文件</div>
+                            <div class="path mt-1" title="${escapeHtml(s.path)}">${escapeHtml(pathShort)}</div>
+                            <div class="path mt-1"><small>匹配: ${escapeHtml(globsStr)}</small></div>
+                        </div>`;
+                    }).join('') || '<div class="text-muted small">未上报 log_sources（检查 Agent 配置）</div>';
+
+                    const legacyPorts = info.ports || {};
+                    const normalizedPorts = portChecks.length
+                        ? portChecks
+                        : Object.keys(legacyPorts).sort((a, b) => Number(a) - Number(b)).map(port => ({
+                            port: Number(port),
+                            host: '127.0.0.1',
+                            name: port,
+                            ok: legacyPorts[port],
+                            service_key: ''
+                        }));
+                    const portCells = normalizedPorts.map(p => {
+                        const label = displayService(host, p.service_key, p.service_name);
+                        const svcLine = p.service_key ? `<div class="resource-subtitle">${escapeHtml(label)} · ${escapeHtml(p.service_key)}</div>` : '';
+                        const product = p.product_line ? `<div class="resource-subtitle">产品线：${escapeHtml(p.product_line)}</div>` : '';
+                        return `
+                        <div class="resource-tile ${p.ok ? 'port-ok' : 'port-bad'}">
+                            <div class="d-flex justify-content-between gap-2 align-items-start">
+                                <div class="resource-title">${escapeHtml(p.name || p.port)}</div>
+                                <span class="badge ${p.ok ? 'bg-success-subtle text-success border border-success' : 'bg-danger text-white'}">${p.ok ? '通' : '断'}</span>
+                            </div>
+                            <div class="resource-subtitle">${escapeHtml(p.host || '127.0.0.1')}:${escapeHtml(p.port)}</div>
+                            ${svcLine}
+                            ${product}
+                        </div>`;
+                    }).join('') || '<span class="text-muted small">未配置端口探测</span>';
+
+                    if (charts[chartId]) {
+                        charts[chartId].dispose();
+                        delete charts[chartId];
+                    }
+
+                    col.innerHTML = `
+                        <div class="card server-card">
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between align-items-start flex-wrap gap-2">
+                                    <div>
+                                        <h5 class="server-title">${escapeHtml(host)}</h5>
+                                        <div class="text-muted small mt-1">${sources.length} 个日志源 · ${normalizedPorts.length} 个端口探测</div>
+                                    </div>
+                                    <div class="d-flex flex-wrap justify-content-end gap-1">
+                                        <span class="badge bg-secondary">${typeof watcherCount === 'number' ? ('tail 线程 ' + watcherCount) : ''}</span>
+                                        ${info.config_path ? `<span class="badge bg-dark config-badge">配置 ${escapeHtml(info.config_path)}</span>` : ''}
+                                    </div>
+                                </div>
+                                <div class="metric-strip mt-3">
+                                    <div class="metric-cell">
+                                        <div class="metric-label">CPU</div>
+                                        <div class="metric-value">${escapeHtml(String(metrics.cpu ?? '-'))}%</div>
+                                    </div>
+                                    <div class="metric-cell">
+                                        <div class="metric-label">内存</div>
+                                        <div class="metric-value">${escapeHtml(String(metrics.memory ?? '-'))}%</div>
+                                    </div>
+                                    <div class="metric-cell">
+                                        <div class="metric-label">磁盘</div>
+                                        <div class="metric-value ${(metrics.disk > 90) ? 'text-danger' : ''}">${escapeHtml(String(metrics.disk ?? '-'))}%</div>
+                                    </div>
+                                </div>
+                                <div id="${chartId}" class="chart-container"></div>
+                                <hr class="soft-divider">
+                                <div class="section-label">端口存活（TCP）</div>
+                                <div class="resource-grid mb-2">${portCells}</div>
+                                <div class="section-label mt-3">Windows 服务</div>
+                                <div id="wsvc-${hostKey}" class="d-flex flex-wrap gap-1 mb-2"></div>
+                                <div class="section-label mt-3">日志源 / 服务映射</div>
+                                <div class="sources-grid">${sourceCells}</div>
+                                <hr class="soft-divider">
+                                <div class="section-label">Java 进程关键字</div>
+                                <div id="proc-${hostKey}" class="d-flex flex-wrap gap-2"></div>
+                            </div>
+                        </div>`;
+
+                    const procContainer = document.getElementById(`proc-${hostKey}`);
+                    let procHtml = '';
+                    Object.keys(processes).forEach(p => {
+                        const isRun = processes[p];
+                        const label = displayService(host, p, p);
+                        procHtml += `<span class="badge ${isRun ? 'bg-success-subtle text-success border border-success' : 'bg-danger text-white'} px-2 py-1">
+                            <span class="status-dot ${isRun ? 'bg-running' : 'bg-stopped'}"></span>${escapeHtml(label)}
+                        </span>`;
+                    });
+                    procContainer.innerHTML = procHtml || '<span class="text-muted small">无 services 配置</span>';
+
+                    const wBox = document.getElementById(`wsvc-${hostKey}`);
+                    const wsvc = info.windows_services || {};
+                    let whtml = '';
+                    Object.keys(wsvc).forEach((nm) => {
+                        const ok = wsvc[nm];
+                        whtml += `<span class="badge ${ok ? 'bg-success-subtle text-success border border-success' : 'bg-danger text-white'} px-2 py-1">${escapeHtml(nm)}: ${ok ? 'RUNNING' : '停止'}</span>`;
+                    });
+                    wBox.innerHTML = whtml || '<span class="text-muted small">未配置 windows_services</span>';
+
+                    const hist = data.history && data.history[host];
+                    if (hist && (hist.cpu.length || hist.mem.length)) {
+                        initOrUpdateChart(host, hist.cpu, hist.mem);
+                    }
+                });
+
+                rebuildSourceFilter();
+                renderLogs();
+                if (trendChart) trendChart.resize();
+            })
+            .catch(() => {
+                document.getElementById('last-update').textContent = '请求失败（检查地址或跨域）';
+            });
+    }
+
+    document.getElementById('btn-save-base').addEventListener('click', () => {
+        localStorage.setItem(LS_KEY, document.getElementById('api-base').value.trim());
+        updateDashboard();
+    });
+
+    document.getElementById('btn-clear-log').addEventListener('click', () => {
+        document.getElementById('log-terminal').innerHTML = '';
+    });
+
+    document.getElementById('filter-host').addEventListener('change', () => {
+        rebuildSourceFilter();
+        renderLogs();
+    });
+    document.getElementById('filter-source').addEventListener('change', renderLogs);
+    document.getElementById('filter-service').addEventListener('change', renderLogs);
+
+    (function initBaseInput() {
+        const saved = localStorage.getItem(LS_KEY);
+        if (saved) document.getElementById('api-base').value = saved;
+    })();
+
+    setInterval(updateDashboard, 3000);
+    window.addEventListener('resize', () => {
+        Object.values(charts).forEach(c => c && c.resize());
+        if (trendChart) trendChart.resize();
+    });
+    updateDashboard();
+</script>
+
+</body>
+</html>

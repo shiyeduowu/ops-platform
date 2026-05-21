@@ -1,0 +1,14 @@
+{
+  "port:127.0.0.1:9171:bus-runner": true,
+  "port:127.0.0.1:9173:bus-runner": true,
+  "port:127.0.0.1:9175:bus-builder": true,
+  "port:127.0.0.1:9176:bus-builder": true,
+  "port:127.0.0.1:9177:bus-commonbiz": true,
+  "port:127.0.0.1:9179:bus-commonbiz": true,
+  "port:127.0.0.1:9180:bus-dtc": true,
+  "port:127.0.0.1:8076:bus-dtc": true,
+  "disk:C:\\": false,
+  "disk:D:\\": false,
+  "disk:E:\\": false,
+  "disk:F:\\": false
+}

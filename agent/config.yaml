@@ -1,0 +1,191 @@
+# =============================================================================
+# 运维 Agent（Windows + Tomcat / Java 多实例）— 参考配置
+# 同一 ops-agent.exe 可拷到多机，仅改本文件即可复用
+# =============================================================================
+
+server_url: "http://127.0.0.1:5000"
+hostname: "Win-Runner-01"
+
+customer:
+  id: "customer-demo"
+  name: "示例客户"
+
+alerts:
+  enabled: true
+  # 为空时默认发送到 server_url + /alert；公网接收端可写成 http://公网IP:5000/alert
+  endpoint: ""
+  # 为空时默认发送到 server_url + /heartbeat
+  heartbeat_endpoint: ""
+  # 公网部署建议设置共享密钥，并在 server_config.yaml 的 auth_token 中保持一致
+  token: 'z1Z1Q|B9]uP*|LSRM*hS.}0a=|lEw0o@h:[.4j5iDl]8H[?D]F/7.\69,;4Txw.m'
+  # 为空时 Agent 自动探测本机 IP
+  server_ip: ""
+  disk_free_threshold_percent: 5
+  port_down_alert: true
+  disk_low_alert: true
+  queue_file: "alert_queue.jsonl"
+  state_file: "alert_state.json"
+  max_queue_entries: 1000
+  retry_interval_seconds: 30
+
+# 业务/产品线目录。service_key 是日志源、端口、进程关键字之间的统一关联键。
+service_catalog:
+  - service_key: bus-builder
+    name: Builder 构建服务
+    product_line: DBE
+  - service_key: bus-runner
+    name: Runner 执行服务
+    product_line: DBE
+  - service_key: bus-dtc
+    name: DTC 调度服务
+    product_line: DBE
+  - service_key: bus-commonbiz
+    name: CommonBiz 公共业务
+    product_line: DBE
+
+# Java 进程关键字：java.exe 命令行包含即视为「进程在跑」（多实例时建议与目录名/服务名一致）
+services:
+  - "bus-builder"
+  - "bus-runner"
+  - "bus-dtc"
+  - "bus-commonbiz"
+
+# ---------------------------------------------------------------------------
+# 显式日志源：Tomcat 统一 logs 或各业务独立目录；service_key 用于前端「服务」分类
+# ---------------------------------------------------------------------------
+log_sources:
+  - id: runner-tomcat-logs
+    name: Runner Tomcat 日志
+    service_key: bus-runner
+    product_line: DBE
+    path: C:/seentao/dbe/backend/common/tomcats/runner/apache-tomcat-runner/logs
+    globs:
+      - "*.log"
+      - "catalina.*.log"
+      - "localhost.*.log"
+    scan_interval_seconds: 50
+  - id: dtc-tomcat-logs
+    name: DTC Tomcat 日志
+    service_key: bus-dtc
+    product_line: DBE
+    path: C:/seentao/dbe/backend/common/tomcats/runner/apache-tomcat-dtc/logs
+    globs:
+      - "*.log"
+      - "catalina.*.log"
+      - "localhost.*.log"
+    scan_interval_seconds: 50
+
+# ---------------------------------------------------------------------------
+# 自动发现：在根目录下每个子目录里找 logs/，生成「子目录名-auto」日志源
+# 适合多 Runner / 多 Tomcat 实例目录并列摆放（可再补充上面 log_sources 未列产品）
+# ---------------------------------------------------------------------------
+log_discovery:
+  - root: C:/seentao/dbe/backend/common/tomcats
+    mode: direct_child_logs
+    # id_prefix: "svc-"   # 可选，避免与上面 id 冲突
+    service_key: '{folder}'   # 占位符替换为子目录名
+    glob: "*.log"
+    scan_interval_seconds: 60
+
+# ---------------------------------------------------------------------------
+# 本机 Tomcat 业务端口探测（多实例时按实际修改）；推荐使用结构化配置，便于前端展示归属。
+# 仍兼容旧写法：port_checks: [9171, 9173, 9180]
+# ---------------------------------------------------------------------------
+port_checks:
+  - port: 9171
+    name: Runner API
+    service_key: bus-runner
+    product_line: DBE
+  - port: 9173
+    name: Runner 管理端口
+    service_key: bus-runner
+    product_line: DBE
+  - port: 9175
+    name: Builder API
+    service_key: bus-builder
+    product_line: DBE
+  - port: 9176
+    name: Builder 管理端口
+    service_key: bus-builder
+    product_line: DBE
+  - port: 9177
+    name: CommonBiz API
+    service_key: bus-commonbiz
+    product_line: DBE
+  - port: 9179
+    name: CommonBiz 管理端口
+    service_key: bus-commonbiz
+    product_line: DBE
+  - port: 9180
+    name: DTC API
+    service_key: bus-dtc
+    product_line: DBE
+  - port: 8076
+    name: DTC 管理端口
+    service_key: bus-dtc
+    product_line: DBE
+port_check_timeout_seconds: 0.6
+
+# Windows 服务名（sc query 查 RUNNING），按本机服务名改
+# windows_services:
+#   - "Tomcat9"
+#   - "OracleServiceORCL"
+
+# ---------------------------------------------------------------------------
+# 断点续读：按文件路径保存 offset，Agent 重启后从上次位置继续，避免再扫历史重复上报
+# new_file_without_state: 从未记录过的新建/轮转日志文件，从文件头或文件尾开始
+# ---------------------------------------------------------------------------
+tail_resume:
+  enabled: true
+  offset_file: "tail_offsets.json"
+  new_file_without_state: "beginning"
+
+# ---------------------------------------------------------------------------
+# 异常聚合（Agent 侧）：同一指纹在时间窗口内只上报一次，减轻刷屏
+# ---------------------------------------------------------------------------
+dedup:
+  enabled: true
+  window_seconds: 120
+  max_entries: 4000
+
+# ---------------------------------------------------------------------------
+# 并发 tail 上限（Semaphore）；日志文件极多时超过上限的 tail 会延后至下一轮扫描重试
+# ---------------------------------------------------------------------------
+tail_limits:
+  max_concurrent_tails: 48
+  max_exception_lines: 450
+
+# ---------------------------------------------------------------------------
+# 日志定期清理：默认关闭；开启前建议先保持 dry_run: true 观察输出
+# ---------------------------------------------------------------------------
+log_cleanup:
+  enabled: false
+  retention_days: 30
+  dry_run: true
+  interval_seconds: 3600
+
+# ---------------------------------------------------------------------------
+# 关键字（Oracle / Tomcat / Spring / Java 常见）
+# ---------------------------------------------------------------------------
+error_keywords:
+  - "ERROR"
+  - "Exception"
+  - "SEVERE"
+  - "ORA-"
+  - "SQLException"
+  - "OutOfMemoryError"
+  - "Caused by"
+
+# Tomcat 英文日期格式日志请改成例如 ^\\d{2}-[A-Za-z]{3}-\\d{4} 或放宽为多段正则
+# stack_date_line_regex: '^\\d{4}-\\d{2}-\\d{2}'
+
+# 本地高频自检，端口/磁盘状态翻转时立即上报告警
+local_check_interval_seconds: 60
+# 低频心跳，Server 用于判断服务器/Agent 是否存活
+heartbeat_interval_seconds: 7200
+# 兼容旧 /report 的低频状态刷新周期
+report_interval_seconds: 7200
+scan_interval_seconds: 45
+
+system:
+  disk_path: "C:\\"

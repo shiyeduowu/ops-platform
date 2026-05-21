@@ -1,0 +1,133 @@
+# 中控 Web 服务监听（仅服务端 exe / python server/app.py 使用）
+# 可复制到与 ops-server.exe 同目录；也可用环境变量 OPS_SERVER_CONFIG 指向任意路径
+
+host: "0.0.0.0"
+port: 5000
+
+# 公网部署建议填写随机长字符串；Agent alerts.token 需保持一致。
+auth_token: 'z1Z1Q|B9]uP*|LSRM*hS.}0a=|lEw0o@h:[.4j5iDl]8H[?D]F/7.\69,;4Txw.m'
+
+database:
+  enabled: true
+  path: "ops_monitor.db"
+
+deadman:
+  enabled: true
+  check_interval_seconds: 60
+  # Agent 默认 2 小时一次心跳，这里设置为 2 小时 5 分钟。
+  default_timeout_seconds: 7500
+
+webhooks:
+  enabled: true
+  timeout_seconds: 8
+  workers: 2
+  routes:
+    # 本机测试路由：收到 /alert 后异步 POST 到 /debug/webhook，可在前端查看转发结果。
+    - name: "local-debug"
+      enabled: true
+      match:
+        severity: "*"
+        type: "*"
+        status: "*"
+      request:
+        method: "POST"
+        url: "http://127.0.0.1:5000/debug/webhook"
+        headers:
+          Content-Type: "application/json"
+        body_template: |
+          {
+            "title": "{{severity}} {{type}} {{status}}",
+            "content": "{{customer}} {{product}} {{hostname}} {{message}}",
+            "hostname": "{{hostname}}",
+            "type": "{{type}}",
+            "status": "{{status}}",
+            "severity": "{{severity}}",
+            "server_ip": "{{server_ip}}",
+            "service_key": "{{service_key}}",
+            "port": "{{port}}",
+            "observed_at": "{{observed_at}}"
+          }
+
+    # 你的手机通知接口：生产启用。ChannelKey 为通道 key。
+    - name: "ijingniu-push"
+      enabled: true
+      match:
+        severity:
+          - "critical"
+          - "warning"
+          - "info"
+      request:
+        method: "POST"
+        url: "http://push.ijingniu.cn/push"
+        headers:
+          Content-Type: "application/json; charset=UTF-8"
+        body_template: |
+          {
+            "ChannelKey": "03d172164beb405382d8fc3b7e3bdc09",
+            "TemId": "",
+            "KeyWord1": "{{hostname}}",
+            "KeyWord2": "{{type}} {{status}}",
+            "Head": "[{{severity}}] {{customer}} {{product}} {{hostname}}",
+            "Body": "### 运维监控通知\n\n- 主机: {{hostname}}\n- IP: {{server_ip}}\n- 类型: {{type}}\n- 状态: {{status}}\n- 级别: {{severity}}\n- 服务: {{service_key}}\n- 端口: {{port}}\n- 时间: {{observed_at}}\n\n{{message}}"
+          }
+
+    # 钉钉示例：替换 access_token 后启用。
+    - name: "dingtalk-example"
+      enabled: false
+      match:
+        severity:
+          - "critical"
+          - "warning"
+      request:
+        method: "POST"
+        url: "https://oapi.dingtalk.com/robot/send?access_token=REPLACE_ME"
+        headers:
+          Content-Type: "application/json"
+        body_template: |
+          {
+            "msgtype": "text",
+            "text": {
+              "content": "[{{severity}}] {{customer}}/{{product}} {{hostname}} {{message}}"
+            }
+          }
+
+    # 企业微信示例：替换 key 后启用。
+    - name: "wecom-example"
+      enabled: false
+      request:
+        method: "POST"
+        url: "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=REPLACE_ME"
+        headers:
+          Content-Type: "application/json"
+        body_template: |
+          {
+            "msgtype": "text",
+            "text": {
+              "content": "[{{severity}}] {{hostname}} {{message}}"
+            }
+          }
+
+    # PushDeer 示例：替换 pushkey 后启用。
+    - name: "pushdeer-example"
+      enabled: false
+      request:
+        method: "POST"
+        url: "https://api2.pushdeer.com/message/push"
+        headers:
+          Content-Type: "application/json"
+        body_template: |
+          {
+            "pushkey": "REPLACE_ME",
+            "text": "[{{severity}}] {{type}} {{status}}",
+            "desp": "{{customer}} {{product}} {{hostname}} {{message}}"
+          }
+
+default_stale_seconds: 7500
+
+# 设定应当持续上报的服务器。未收到请求或超时后，/api/status 会返回 missing/stale。
+monitored_agents:
+  # - hostname: "Win-Runner-01"
+  #   customer: "示例客户"
+  #   product: "Runner"
+  #   server_ip: "192.168.1.20"
+  #   stale_seconds: 7500
