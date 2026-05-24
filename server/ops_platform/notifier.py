@@ -224,6 +224,22 @@ class CustomHTTPChannel(NotificationChannel):
         "title", "content",
     ]
 
+    # 默认请求体模板
+    DEFAULT_BODY_TEMPLATE = (
+        '{\n'
+        '  "alert_id": "{{alert_id}}",\n'
+        '  "type": "{{alert_type}}",\n'
+        '  "severity": "{{severity}}",\n'
+        '  "hostname": "{{hostname}}",\n'
+        '  "agent_id": "{{agent_id}}",\n'
+        '  "message": "{{message}}",\n'
+        '  "timestamp": "{{timestamp}}",\n'
+        '  "title": "{{title}}",\n'
+        '  "content": "{{content}}",\n'
+        '  "details": {{details_json}}\n'
+        '}'
+    )
+
     def __init__(self, url: str, method: str = "POST", headers: dict = None,
                  body_template: str = None, timeout: int = 15):
         self.url = url
@@ -250,15 +266,13 @@ class CustomHTTPChannel(NotificationChannel):
         }
 
         try:
-            if self.body_template:
-                body_str = self._render_template(self.body_template, variables)
-                # 尝试解析为 JSON；如果失败则作为纯文本发送
-                try:
-                    payload = _json.loads(body_str)
-                except _json.JSONDecodeError:
-                    payload = body_str
-            else:
-                payload = variables
+            template = self.body_template or self.DEFAULT_BODY_TEMPLATE
+            body_str = self._render_template(template, variables)
+            # 尝试解析为 JSON；如果失败则作为纯文本发送
+            try:
+                payload = _json.loads(body_str)
+            except _json.JSONDecodeError:
+                payload = body_str
 
             with httpx.Client(timeout=self.timeout) as client:
                 if self.method == "GET":

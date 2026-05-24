@@ -122,7 +122,7 @@ async def resolve_alert(
     alert = result.scalar_one_or_none()
     if not alert:
         raise HTTPException(404, "告警不存在")
-    if alert.status != "open":
+    if alert.status not in ("open", "acknowledged"):
         raise HTTPException(400, f"告警当前状态为 {alert.status}，无法解决")
     alert.status = "resolved"
     await db.commit()

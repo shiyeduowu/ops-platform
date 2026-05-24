@@ -288,9 +288,9 @@ async def check_agent_heartbeat(db: AsyncSession) -> None:
             continue
 
         config = configs_map.get(agent.agent_id)
-        heartbeat_interval = 7200  # 默认 2 小时
+        heartbeat_interval = 60  # 默认 60 秒
         if config and config.config_json:
-            heartbeat_interval = config.config_json.get("heartbeat_interval_seconds", 7200)
+            heartbeat_interval = config.config_json.get("heartbeat_interval_seconds", 60)
 
         # 兼容 naive datetime（SQLite）
         last_seen = agent.last_seen

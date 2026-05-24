@@ -135,12 +135,24 @@ function getConfigFields(type: string) {
     ];
   }
   if (type === "custom_http") {
+    const defaultTemplate = JSON.stringify({
+      alert_id: "{{alert_id}}",
+      type: "{{alert_type}}",
+      severity: "{{severity}}",
+      hostname: "{{hostname}}",
+      agent_id: "{{agent_id}}",
+      message: "{{message}}",
+      timestamp: "{{timestamp}}",
+      title: "{{title}}",
+      content: "{{content}}",
+      details: "{{details_json}}",
+    }, null, 2);
     return [
       { key: "url", label: "请求地址", placeholder: "https://your-api.com/alerts" },
       { key: "method", label: "请求方法", placeholder: "POST", type: "select", options: ["POST", "PUT", "PATCH", "GET"] },
       { key: "timeout", label: "超时(秒)", placeholder: "15", type: "number" },
       { key: "headers", label: "请求头", type: "kv" },
-      { key: "body_template", label: "请求体模板", placeholder: '{"msg": "{{message}}", "level": "{{severity}}"}', type: "textarea" },
+      { key: "body_template", label: "请求体模板（留空使用默认模板）", placeholder: defaultTemplate, type: "textarea" },
     ];
   }
   return [
@@ -213,7 +225,7 @@ onMounted(load);
               <input v-else v-model="form.config[field.key]" :placeholder="field.placeholder" :type="field.type === 'number' ? 'number' : field.key === 'password' ? 'password' : 'text'" />
             </label>
             <div v-if="field.key === 'body_template'" class="vars-hint">
-              可用变量: alert_id, alert_type, severity, hostname, agent_id, message, timestamp, details_json
+              可用变量: {{alert_id}} {{alert_type}} {{severity}} {{hostname}} {{agent_id}} {{message}} {{timestamp}} {{fingerprint}} {{details_json}} {{title}} {{content}} — 留空使用默认 JSON 模板
             </div>
           </template>
           <div class="form-actions">

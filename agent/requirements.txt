@@ -8,3 +8,5 @@ selenium>=4.15.0
 # 方案2: Playwright（需额外下载 Chromium）
 # pip install playwright && playwright install chromium
 playwright>=1.40.0
+# Windows 服务支持（仅 Windows 需要）
+pywin32>=306; sys_platform == "win32"

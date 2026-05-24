@@ -67,7 +67,7 @@ DEFAULT_AGENT_CONFIG: dict[str, Any] = {
     "cpu_threshold": 90,                # CPU 使用率告警阈值 (%)
     "memory_threshold": 90,             # 内存使用率告警阈值 (%)
     "check_interval_seconds": 30,       # Agent 本地检测间隔（高频，30秒）
-    "heartbeat_interval_seconds": 7200, # 心跳间隔（2小时，仅做存活证明）
+    "heartbeat_interval_seconds": 60,   # 心跳间隔（60秒，快速检测离线/恢复）
     "log_sources": [],                  # 日志采集源
     "browser_engine": "auto",           # 浏览器引擎: auto | chromedriver | playwright
     "chromedriver_path": "",            # ChromeDriver 路径（空=从 PATH 查找）
@@ -220,10 +220,37 @@ async def heartbeat(
     if payload.version:
         agent.version = payload.version
 
-    # Agent 恢复在线 → 自动解决离线告警
-    from ops_platform.scheduler import _make_fingerprint, resolve_alert
+    # Agent 恢复在线 → 自动解决离线告警 + 发送恢复通知
+    from ops_platform.scheduler import _make_fingerprint, resolve_alert, create_alert_if_not_exists, send_alert_notifications, broadcast_alert_ws
     offline_fp = _make_fingerprint(agent.agent_id, "agent_offline")
+    was_offline = agent.status == "offline"
     await resolve_alert(db, offline_fp)
+
+    # 发送恢复通知
+    if was_offline:
+        recovery_fp = _make_fingerprint(agent.agent_id, "agent_recovered")
+        recovery_alert = await create_alert_if_not_exists(
+            db=db,
+            tenant_id=agent.tenant_id,
+            agent_id=agent.agent_id,
+            alert_type="agent_recovered",
+            severity="info",
+            message=f"Agent {agent.hostname}({agent.agent_id}) 已恢复在线",
+            fingerprint=recovery_fp,
+            details={"hostname": agent.hostname, "ip": agent.ip},
+        )
+        if recovery_alert:
+            await send_alert_notifications(
+                db=db,
+                tenant_id=agent.tenant_id,
+                agent_id=agent.agent_id,
+                agent_hostname=agent.hostname,
+                alert_type="agent_recovered",
+                severity="info",
+                message=recovery_alert.message,
+                alert_id=recovery_alert.id,
+            )
+            await broadcast_alert_ws(recovery_alert)
 
     # 存储指标历史
     if payload.metrics:
