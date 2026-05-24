@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from ops_platform.api.v1.routes import agents, alerts, auth, configs, license, logs, stress_tests, system_config, tenant, template, notifications, audit, agent_groups, remote_commands, file_distributions, deployments
+from ops_platform.api.v1.routes import aiops
 
 
 api_router = APIRouter()
@@ -22,3 +23,4 @@ api_router.include_router(agent_groups.router)
 api_router.include_router(remote_commands.router)
 api_router.include_router(file_distributions.router)
 api_router.include_router(deployments.router)
+api_router.include_router(aiops.router)

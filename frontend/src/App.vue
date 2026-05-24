@@ -2,6 +2,7 @@
 import {
   Activity,
   Bell,
+  Bot,
   Cog,
   FileSpreadsheet,
   FileText,
@@ -25,6 +26,7 @@ import { useRoute, useRouter } from "vue-router";
 import { clearSession, connectDashboardSocket } from "./api";
 import { bus } from "./events";
 import ToastContainer from "./components/ToastContainer.vue";
+import AiChatPanel from "./components/aiops/AiChatPanel.vue";
 
 const route = useRoute();
 const router = useRouter();
@@ -69,6 +71,7 @@ const navGroups = computed<NavGroup[]>(() => {
       items: [
         { to: "/license", label: "授权", icon: ShieldCheck },
         { to: "/template", label: "模板生成", icon: FileSpreadsheet },
+        { to: "/ai-settings", label: "AI 设置", icon: Bot },
       ],
     },
   ];
@@ -79,6 +82,7 @@ const navGroups = computed<NavGroup[]>(() => {
 });
 
 const unreadAlerts = ref(0);
+const aiChatOpen = ref(false);
 let dashWs: WebSocket | null = null;
 
 onMounted(() => {
@@ -113,6 +117,10 @@ function logout() {
   <RouterView v-if="isLogin" />
   <template v-else>
   <ToastContainer />
+  <AiChatPanel :open="aiChatOpen" @close="aiChatOpen = false" />
+  <button class="ai-fab" title="AI 助手" @click="aiChatOpen = true">
+    <Bot :size="24" />
+  </button>
   <div class="app-shell">
     <aside class="sidebar">
       <div class="brand">

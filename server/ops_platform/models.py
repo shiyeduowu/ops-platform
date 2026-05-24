@@ -500,3 +500,36 @@ class SoftwareDeploymentTarget(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     deployment: Mapped["SoftwareDeployment"] = relationship(back_populates="targets")
+
+
+class AiopsConfig(Base):
+    """Per-tenant AI 运维配置"""
+    __tablename__ = "aiops_configs"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", name="uq_aiops_config_tenant"),
+    )
+
+    id: Mapped[int] = mapped_column(BigIntPk, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    enabled: Mapped[bool] = mapped_column(default=True, nullable=False)
+    model_override: Mapped[str | None] = mapped_column(String(100), nullable=True)  # 租户可自定义模型
+    config_json: Mapped[dict] = mapped_column(JsonDocument, default=dict, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
+
+
+class KnowledgeDocument(Base):
+    """知识库文档元数据（RAG）"""
+    __tablename__ = "knowledge_documents"
+    __table_args__ = (
+        Index("idx_kd_tenant_source", "tenant_id", "source_type"),
+    )
+
+    id: Mapped[int] = mapped_column(BigIntPk, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[int] = mapped_column(ForeignKey("tenants.id", ondelete="CASCADE"), index=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    source_type: Mapped[str] = mapped_column(String(30), nullable=False)  # manual/alert/inspection/script
+    source_id: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    embedding_status: Mapped[str] = mapped_column(String(20), default="pending", nullable=False)  # pending/done/failed
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, nullable=False)

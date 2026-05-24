@@ -12,16 +12,34 @@ logger = logging.getLogger("remote.shell")
 
 # 平台感知的白名单
 WINDOWS_COMMANDS = {
+    # 基础系统
     "ipconfig", "hostname", "whoami", "systeminfo", "tasklist",
     "netstat", "ping", "dir", "type", "echo", "date", "time",
     "ver", "tree", "findstr",
+    # Windows 服务/进程管理
+    "sc", "net", "wmic", "taskkill", "schtasks",
+    # Java 诊断
+    "java", "jstack", "jmap", "jcmd", "jps", "jstat", "jinfo",
+    # 数据库 CLI
+    "mysql", "redis-cli", "sqlplus", "sqlite3", "mongosh",
+    # Python/Node 诊断
+    "python", "pip",
 }
 
 POSIX_COMMANDS = {
+    # 基础系统
     "hostname", "whoami", "ping", "echo", "date",
     "df", "free", "uptime", "ps", "cat", "ls", "uname",
     "ifconfig", "dig", "nslookup", "traceroute", "tail", "head",
     "wc", "grep", "sort", "uniq", "du", "nslookup",
+    # 进程管理
+    "top", "kill", "pkill", "lsof", "ss", "vmstat", "iostat",
+    # Java 诊断
+    "java", "jstack", "jmap", "jcmd", "jps", "jstat", "jinfo",
+    # 数据库 CLI
+    "mysql", "redis-cli", "sqlplus", "sqlite3", "mongosh",
+    # Python 诊断
+    "python", "python3", "pip",
 }
 
 # 危险的 shell 元字符 — 任何包含这些字符的命令都会被拒绝

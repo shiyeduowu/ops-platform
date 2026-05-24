@@ -101,6 +101,9 @@ class Settings:
     # CORS 白名单（生产环境必须设置）
     cors_origins: list[str] = field(default_factory=lambda: _parse_cors_origins())
 
+    # AIOps 配置（实际由 modules/aiops/config.py 管理，此处仅作文档占位）
+    # 相关环境变量: AIOPS_ENABLED, AIOPS_API_KEY, AIOPS_BASE_URL, AIOPS_MODEL
+
 
 def _parse_cors_origins() -> list[str]:
     """解析 CORS 源白名单"""

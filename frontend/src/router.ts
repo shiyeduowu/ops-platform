@@ -23,6 +23,7 @@ const router = createRouter({
     { path: "/remote-commands", name: "remote-commands", meta: { title: "远程命令" }, component: () => import("./views/RemoteCommandsView.vue") },
     { path: "/file-distributions", name: "file-distributions", meta: { title: "文件分发" }, component: () => import("./views/FileDistributionsView.vue") },
     { path: "/deployments", name: "deployments", meta: { title: "软件部署" }, component: () => import("./views/DeploymentsView.vue") },
+    { path: "/ai-settings", name: "ai-settings", meta: { title: "AI 设置" }, component: () => import("./views/AiSettingsView.vue") },
     { path: "/:pathMatch(.*)*", name: "not-found", component: () => import("./views/NotFoundView.vue") }
   ]
 });

@@ -386,6 +386,20 @@ async def check_scheduled_tests(db: AsyncSession) -> None:
 # 主循环
 # ============================================================================
 
+async def check_pending_knowledge_docs(db: AsyncSession) -> None:
+    """处理待向量化的知识库文档"""
+    try:
+        from ops_platform.modules.aiops.rag.ingest import ingest_pending_documents
+
+        count = await ingest_pending_documents(db)
+        if count > 0:
+            await db.commit()
+    except ImportError:
+        pass  # RAG 依赖未安装，跳过
+    except Exception as e:
+        logger.error(f"知识库摄入异常: {e}", exc_info=True)
+
+
 async def patrol_loop() -> None:
     """
     Server 巡检主循环
@@ -402,6 +416,7 @@ async def patrol_loop() -> None:
             async with AsyncSessionLocal() as db:
                 await check_agent_heartbeat(db)
                 await check_scheduled_tests(db)
+                await check_pending_knowledge_docs(db)
         except asyncio.CancelledError:
             logger.info("Server 巡检调度器已停止")
             break

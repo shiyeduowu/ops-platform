@@ -28,14 +28,24 @@ router = APIRouter(prefix="/remote-commands", tags=["remote-commands"])
 
 # 白名单命令 — 两个平台的并集（Agent 端会按平台二次校验）
 ALLOWED_SHELL_COMMANDS = {
-    # Windows
+    # Windows 基础
     "ipconfig", "hostname", "whoami", "systeminfo", "tasklist",
     "netstat", "ping", "dir", "type", "echo", "date", "time",
     "ver", "tree", "findstr",
-    # POSIX
+    # POSIX 基础
     "df", "free", "uptime", "ps", "cat", "ls", "uname",
     "ifconfig", "dig", "nslookup", "traceroute", "tail", "head",
     "wc", "grep", "sort", "uniq", "du",
+    # Windows 服务/进程管理
+    "sc", "net", "wmic", "taskkill", "schtasks",
+    # 进程管理 (POSIX)
+    "top", "kill", "pkill", "lsof", "ss", "vmstat", "iostat",
+    # Java 诊断
+    "java", "jstack", "jmap", "jcmd", "jps", "jstat", "jinfo",
+    # 数据库 CLI
+    "mysql", "redis-cli", "sqlplus", "sqlite3", "mongosh",
+    # Python/Node 诊断
+    "python", "python3", "pip",
 }
 
 # 危险的 shell 元字符
