@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.db
+.venv/
+venv/
+frontend/node_modules/
+frontend/tsconfig.tsbuildinfo
+agent/demo-data/
+agent/agent_credentials.json
+agent/agent_config_cache.json
+agent/alert_state.json
+logs/
+server/static/
+dist/stage/
+.idea/

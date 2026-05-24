@@ -1,0 +1,129 @@
+# 字段行为定义
+# 定义每种字段的数据生成规则和验证方式
+
+fields:
+  name:
+    generator: random_name
+    data_type: text
+    min_length: 2
+    max_length: 4
+    required_marker: true  # 通常标记为*
+
+  phone:
+    generator: random_phone
+    data_type: numeric
+    length: 11
+    pattern: "^1[3-9]\\d{9}$"
+
+  username:
+    generator: fixed
+    data_type: text
+    derived_from: ["phone", "student_no", "exam_no"]  # 可从这些字段派生
+
+  password:
+    generator: fixed
+    data_type: text
+    default_value: "Xindao@@2022"
+
+  id_card:
+    generator: random_id_card
+    data_type: text
+    length: 18
+
+  email:
+    generator: random_email
+    data_type: text
+    pattern: "^[\\w.-]+@[\\w.-]+\\.\\w+$"
+
+  school:
+    generator: fixed
+    data_type: text
+    default_value: "新道学院"
+
+  college:
+    generator: cycle
+    data_type: text
+    default_values: ["商学院", "信息学院", "会计学院", "金融学院"]
+
+  major:
+    generator: cycle
+    data_type: text
+    default_values: ["大数据与会计", "电子商务", "市场营销", "金融科技"]
+
+  class_name:
+    generator: cycle
+    data_type: text
+    default_values: ["2024级1班", "2024级2班", "2024级3班", "2024级4班"]
+
+  student_no:
+    generator: sequence
+    data_type: text
+    prefix: "STU"
+    num_digits: 8
+
+  gender:
+    generator: cycle
+    data_type: text
+    default_values: ["男", "女"]
+
+  group_no:
+    generator: group_id
+    data_type: integer
+    start: 1
+    step: 1
+    related_to: ["seat_number", "position"]
+    coupling: group_seat
+
+  seat_number:
+    generator: seat_number
+    data_type: integer
+    start: 1
+    step: 1
+    related_to: ["group_no"]
+    coupling: group_seat
+    cycle_within: group
+
+  position:
+    generator: cycle
+    data_type: text
+    default_values:
+      - ["营销总监", "财务总监", "生产总监", "项目总监", "采购总监", "人力资源总监", "行政总监", "运营总监"]
+      - ["绩效内控", "投融资管理", "营运分析", "预算管理", "税务管理", "资金管理", "财务分析", "成本管理"]
+    cycle_within: group
+
+  exam_no:
+    generator: sequence
+    data_type: text
+    prefix: ""
+    num_digits: 8
+
+  enrollment_year:
+    generator: cycle
+    data_type: text
+    default_values: ["2024", "2023", "2022"]
+
+  education:
+    generator: cycle
+    data_type: text
+    default_values: ["本科", "专科"]
+
+  is_coop:
+    generator: cycle
+    data_type: text
+    default_values: ["是", "否"]
+
+  score:
+    generator: random_number
+    data_type: numeric
+    min_value: 60
+    max_value: 100
+
+  address:
+    generator: fixed
+    data_type: text
+    default_value: ""
+
+  remark:
+    generator: fixed
+    data_type: text
+    default_value: ""

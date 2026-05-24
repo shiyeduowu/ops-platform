@@ -1,0 +1,220 @@
+# 同义词字典配置
+# 用于语义字段匹配，每个多义词组内的词被视为等价
+
+version: "1.0"
+
+fields:
+  # 姓名字段
+  name:
+    display_name: "姓名"
+    synonym_groups:
+      - ["姓名", "真实姓名", "名字", "用户姓名", "真实名"]
+      - ["学生姓名", "考生姓名", "学员姓名", "教师姓名", "老师姓名"]
+      - ["name", "fullname", "full_name", "real_name", "student_name"]
+    generator: random_name
+    priority: 10
+    validators: ["is_chinese_name"]
+
+  # 手机号字段
+  phone:
+    display_name: "手机号"
+    synonym_groups:
+      - ["手机", "手机号", "手机号码", "电话", "电话号码", "联系电话", "移动电话"]
+      - ["联系方式", "通讯号码", "联系电话"]
+      - ["phone", "mobile", "tel", "telephone", "cellphone", "cell"]
+    generator: random_phone
+    priority: 8
+    validators: ["is_phone_number"]
+    related_to: []
+
+  # 用户名/账号字段
+  username:
+    display_name: "用户名/账号"
+    synonym_groups:
+      - ["用户名", "账号", "账户", "登录名", "登录账号"]
+      - ["username", "user", "account", "login"]
+    generator: fixed
+    priority: 7
+
+  # 密码字段
+  password:
+    display_name: "密码"
+    synonym_groups:
+      - ["密码", "初始密码", "默认密码", "登录密码"]
+      - ["password", "pwd", "passwd", "pass"]
+    generator: fixed
+    priority: 6
+
+  # 身份证号字段
+  id_card:
+    display_name: "身份证号"
+    synonym_groups:
+      - ["身份证", "身份证号", "身份证号码", "证件号", "证件号码"]
+      - ["idcard", "id_card", "identity"]
+    generator: random_id_card
+    priority: 9
+    validators: ["is_id_card"]
+
+  # 邮箱字段
+  email:
+    display_name: "邮箱"
+    synonym_groups:
+      - ["邮箱", "邮件", "电子邮箱", "电子邮件", "邮箱地址"]
+      - ["email", "mail", "e-mail"]
+    generator: random_email
+    priority: 7
+    validators: ["is_email"]
+
+  # 学校/单位字段
+  school:
+    display_name: "学校/单位"
+    synonym_groups:
+      - ["学校", "学校名称", "单位", "机构", "所属学校", "所在学校"]
+      - ["school", "organization", "org", "institution"]
+    generator: fixed
+    priority: 5
+
+  # 学院/部门字段
+  college:
+    display_name: "学院/部门"
+    synonym_groups:
+      - ["学院", "部门", "院系", "所属学院", "所在学院"]
+      - ["college", "department", "dept", "faculty"]
+    generator: cycle
+    priority: 5
+
+  # 专业字段
+  major:
+    display_name: "专业"
+    synonym_groups:
+      - ["专业", "专业名称", "方向", "所属专业"]
+      - ["major", "program", "specialty"]
+    generator: cycle
+    priority: 5
+
+  # 班级字段
+  class_name:
+    display_name: "班级"
+    synonym_groups:
+      - ["班级", "班", "班级名称", "所在班级"]
+      - ["class", "class_name", "grade"]
+    generator: cycle
+    priority: 5
+
+  # 学号字段
+  student_no:
+    display_name: "学号"
+    synonym_groups:
+      - ["学号", "学生号", "学生编号", "学号"]
+      - ["student_no", "student_id", "student_number"]
+    generator: sequence
+    priority: 8
+
+  # 性别字段
+  gender:
+    display_name: "性别"
+    synonym_groups:
+      - ["性别"]
+      - ["gender", "sex"]
+    generator: cycle
+    priority: 6
+
+  # 组号字段
+  group_no:
+    display_name: "组号"
+    synonym_groups:
+      - ["组号", "分组", "队伍号", "队号", "小组号", "团队号", "队伍编号"]
+      - ["group", "team", "group_no", "team_no"]
+    generator: group_id
+    priority: 7
+    related_to: ["seat_number", "position"]
+
+  # 座位号字段
+  seat_number:
+    display_name: "座位号"
+    synonym_groups:
+      - ["座位", "座位号", "台位", "台位号", "位置号"]
+      - ["seat", "seat_no", "desk", "desk_no"]
+    generator: seat_number
+    priority: 7
+    related_to: ["group_no"]
+
+  # 岗位字段
+  position:
+    display_name: "岗位"
+    synonym_groups:
+      - ["岗位", "岗位ID", "岗位名称", "职位", "角色"]
+      - ["position", "role", "job", "title"]
+    generator: cycle
+    priority: 6
+    related_to: ["group_no"]
+
+  # 考试号字段
+  exam_no:
+    display_name: "考试号"
+    synonym_groups:
+      - ["考试号", "考号", "准考证号", "准考证", "考试编号"]
+      - ["exam_no", "exam_id", "exam_number"]
+    generator: sequence
+    priority: 9
+
+  # 入学年份字段
+  enrollment_year:
+    display_name: "入学年份"
+    synonym_groups:
+      - ["入学年份", "入学", "年份", "年级"]
+      - ["year", "enrollment_year", "grade_year"]
+    generator: cycle
+    priority: 5
+
+  # 学历字段
+  education:
+    display_name: "学历"
+    synonym_groups:
+      - ["学历", "在读学历", "学位"]
+      - ["education", "degree", "level"]
+    generator: cycle
+    priority: 5
+
+  # 是否共建生字段
+  is_coop:
+    display_name: "是否共建生"
+    synonym_groups:
+      - ["是否共建生", "共建生", "共建"]
+      - ["is_coop", "cooperative"]
+    generator: cycle
+    priority: 4
+
+  # 成绩字段
+  score:
+    display_name: "成绩"
+    synonym_groups:
+      - ["成绩", "分数", "得分", "考试成绩", "总分"]
+      - ["score", "grade", "marks", "points"]
+    generator: random_number
+    priority: 6
+
+  # 地址字段
+  address:
+    display_name: "地址"
+    synonym_groups:
+      - ["地址", "住址", "家庭地址", "通讯地址", "联系地址"]
+      - ["address", "location"]
+    generator: fixed
+    priority: 5
+
+  # 备注字段
+  remark:
+    display_name: "备注"
+    synonym_groups:
+      - ["备注", "说明", "注释", "描述"]
+      - ["remark", "note", "comment", "description"]
+    generator: fixed
+    priority: 3
+
+
+# 自定义关键词扩展（用户可添加，无需改代码）
+custom_keywords: {}
+
+# 模式覆盖（用户可强制指定某些表头的模式）
+pattern_overrides: {}
