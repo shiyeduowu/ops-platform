@@ -16,6 +16,7 @@ import {
   XCircle,
   Clock
 } from "lucide-vue-next";
+import KeyValueEditor from "../components/KeyValueEditor.vue";
 import { onMounted, ref } from "vue";
 import { api } from "../api";
 import EmptyState from "../components/EmptyState.vue";
@@ -37,6 +38,7 @@ const channelTypes = [
   { value: "feishu", label: "飞书", icon: MessageCircle, color: "#3370FF" },
   { value: "email", label: "邮件", icon: Mail, color: "#FF6A00" },
   { value: "webhook", label: "Webhook", icon: Webhook, color: "#8B5CF6" },
+  { value: "custom_http", label: "自定义 HTTP", icon: Globe, color: "#F59E0B" },
 ];
 
 const form = ref({
@@ -132,6 +134,15 @@ function getConfigFields(type: string) {
       { key: "to", label: "收件人", placeholder: "admin@example.com" },
     ];
   }
+  if (type === "custom_http") {
+    return [
+      { key: "url", label: "请求地址", placeholder: "https://your-api.com/alerts" },
+      { key: "method", label: "请求方法", placeholder: "POST", type: "select", options: ["POST", "PUT", "PATCH", "GET"] },
+      { key: "timeout", label: "超时(秒)", placeholder: "15", type: "number" },
+      { key: "headers", label: "请求头", type: "kv" },
+      { key: "body_template", label: "请求体模板", placeholder: '{"msg": "{{message}}", "level": "{{severity}}"}', type: "textarea" },
+    ];
+  }
   return [
     { key: "webhook_url", label: "Webhook URL", placeholder: "https://..." },
   ];
@@ -191,14 +202,20 @@ onMounted(load);
               <option v-for="ct in channelTypes" :key="ct.value" :value="ct.value">{{ ct.label }}</option>
             </select>
           </label>
-          <label v-for="field in getConfigFields(form.channel_type)" :key="field.key" class="form-field">
-            <span>{{ field.label }}</span>
-            <input
-              v-model="form.config[field.key]"
-              :placeholder="field.placeholder"
-              :type="field.key === 'password' ? 'password' : 'text'"
-            />
-          </label>
+          <template v-for="field in getConfigFields(form.channel_type)" :key="field.key">
+            <label class="form-field" :class="{ 'full-width': field.type === 'textarea' || field.type === 'kv' }">
+              <span>{{ field.label }}</span>
+              <select v-if="field.type === 'select'" v-model="form.config[field.key]">
+                <option v-for="opt in field.options" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+              <textarea v-else-if="field.type === 'textarea'" v-model="form.config[field.key]" :placeholder="field.placeholder" rows="6" class="mono-textarea" />
+              <KeyValueEditor v-else-if="field.type === 'kv'" :modelValue="form.config[field.key] || {}" @update:modelValue="form.config[field.key] = $event" />
+              <input v-else v-model="form.config[field.key]" :placeholder="field.placeholder" :type="field.type === 'number' ? 'number' : field.key === 'password' ? 'password' : 'text'" />
+            </label>
+            <div v-if="field.key === 'body_template'" class="vars-hint">
+              可用变量: alert_id, alert_type, severity, hostname, agent_id, message, timestamp, details_json
+            </div>
+          </template>
           <div class="form-actions">
             <button type="submit" class="icon-button primary">创建</button>
             <button type="button" class="icon-button" @click="showCreate = false">取消</button>
@@ -430,6 +447,26 @@ onMounted(load);
   border-radius: 6px;
   font-size: 13px;
   background: var(--bg, #f9fafb);
+}
+.form-field.full-width {
+  grid-column: 1 / -1;
+}
+.mono-textarea {
+  padding: 8px 10px;
+  border: 1px solid var(--border, #d1d5db);
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: "Fira Code", "Cascadia Code", Consolas, monospace;
+  background: var(--bg, #f9fafb);
+  resize: vertical;
+  min-height: 80px;
+}
+.vars-hint {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  color: #6b7280;
+  margin-top: -4px;
+  font-family: monospace;
 }
 .form-actions {
   grid-column: 1 / -1;

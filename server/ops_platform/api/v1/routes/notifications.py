@@ -132,7 +132,7 @@ async def create_channel(
 ):
     """创建通知渠道"""
     # 验证渠道类型
-    valid_types = {"dingtalk", "wecom", "feishu", "email", "webhook"}
+    valid_types = {"dingtalk", "wecom", "feishu", "email", "webhook", "custom_http"}
     if payload.channel_type not in valid_types:
         raise HTTPException(400, f"不支持的渠道类型，可选: {valid_types}")
 
@@ -360,5 +360,21 @@ def _validate_config(channel_type: str, config: dict):
         if "webhook_url" not in config:
             raise HTTPException(400, "webhook 需要 webhook_url 配置")
         _validate_webhook_url(config["webhook_url"])
+    elif channel_type == "custom_http":
+        if "url" not in config:
+            raise HTTPException(400, "自定义 HTTP 通道需要 url 配置")
+        _validate_webhook_url(config["url"])
+        method = config.get("method", "POST")
+        if method not in ("GET", "POST", "PUT", "PATCH"):
+            raise HTTPException(400, "method 必须是 GET/POST/PUT/PATCH")
+        if "headers" in config and not isinstance(config["headers"], dict):
+            raise HTTPException(400, "headers 必须是字典类型")
+        body_template = config.get("body_template")
+        if body_template is not None:
+            if not isinstance(body_template, str) or len(body_template) > 10000:
+                raise HTTPException(400, "body_template 必须是字符串且不超过 10000 字符")
+        timeout = config.get("timeout", 15)
+        if not isinstance(timeout, int) or timeout < 5 or timeout > 60:
+            raise HTTPException(400, "timeout 必须是 5-60 之间的整数")
 
 

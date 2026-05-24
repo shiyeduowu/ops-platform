@@ -185,7 +185,6 @@ class WebhookChannel(NotificationChannel):
         try:
             if self.template:
                 import json
-                # 安全替换：先用 json.dumps 转义特殊字符，再去掉外层引号
                 safe_title = json.dumps(title)[1:-1]
                 safe_content = json.dumps(content)[1:-1]
                 body = self.template.replace("{{title}}", safe_title).replace("{{content}}", safe_content)
@@ -213,6 +212,84 @@ class WebhookChannel(NotificationChannel):
         except Exception as e:
             logger.error(f"Webhook通知异常: {e}")
             return False
+
+
+class CustomHTTPChannel(NotificationChannel):
+    """自定义 HTTP 通知 — 用户完全控制 URL、方法、Headers、Body 模板"""
+
+    # 可用模板变量
+    AVAILABLE_VARS = [
+        "alert_id", "alert_type", "severity", "hostname", "agent_id",
+        "message", "timestamp", "fingerprint", "details_json",
+        "title", "content",
+    ]
+
+    def __init__(self, url: str, method: str = "POST", headers: dict = None,
+                 body_template: str = None, timeout: int = 15):
+        self.url = url
+        self.method = method.upper()
+        self.headers = headers or {}
+        self.body_template = body_template
+        self.timeout = min(max(5, timeout), 60)
+
+    def send(self, title: str, content: str, **kwargs) -> bool:
+        import json as _json
+
+        variables = {
+            "alert_id": str(kwargs.get("alert_id", "")),
+            "alert_type": kwargs.get("alert_type", ""),
+            "severity": kwargs.get("severity", ""),
+            "hostname": kwargs.get("hostname", ""),
+            "agent_id": kwargs.get("agent_id", ""),
+            "message": kwargs.get("message", title),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "fingerprint": str(kwargs.get("fingerprint", "")),
+            "details_json": _json.dumps(kwargs.get("details", {}), ensure_ascii=False) if kwargs.get("details") else "{}",
+            "title": title,
+            "content": content,
+        }
+
+        try:
+            if self.body_template:
+                body_str = self._render_template(self.body_template, variables)
+                # 尝试解析为 JSON；如果失败则作为纯文本发送
+                try:
+                    payload = _json.loads(body_str)
+                except _json.JSONDecodeError:
+                    payload = body_str
+            else:
+                payload = variables
+
+            with httpx.Client(timeout=self.timeout) as client:
+                if self.method == "GET":
+                    resp = client.get(self.url, params=payload if isinstance(payload, dict) else {}, headers=self.headers)
+                elif self.method in ("POST", "PUT", "PATCH"):
+                    method_fn = getattr(client, self.method.lower())
+                    if isinstance(payload, dict):
+                        resp = method_fn(self.url, json=payload, headers=self.headers)
+                    else:
+                        resp = method_fn(self.url, content=body_str.encode("utf-8"), headers=self.headers)
+                else:
+                    logger.error(f"不支持的 HTTP 方法: {self.method}")
+                    return False
+
+            if resp.status_code < 400:
+                logger.info(f"自定义 HTTP 通知发送成功: {resp.status_code}")
+                return True
+            else:
+                logger.error(f"自定义 HTTP 通知发送失败: {resp.status_code} {resp.text[:200]}")
+                return False
+
+        except Exception as e:
+            logger.error(f"自定义 HTTP 通知异常: {e}")
+            return False
+
+    @staticmethod
+    def _render_template(template: str, variables: dict) -> str:
+        result = template
+        for key, value in variables.items():
+            result = result.replace("{{" + key + "}}", str(value))
+        return result
 
 
 def create_channel(channel_type: str, config: dict) -> Optional[NotificationChannel]:
@@ -254,6 +331,14 @@ def create_channel(channel_type: str, config: dict) -> Optional[NotificationChan
             method=config.get("method", "POST"),
             headers=config.get("headers"),
             template=config.get("template")
+        )
+    elif channel_type == "custom_http":
+        return CustomHTTPChannel(
+            url=config["url"],
+            method=config.get("method", "POST"),
+            headers=config.get("headers"),
+            body_template=config.get("body_template"),
+            timeout=config.get("timeout", 15),
         )
     else:
         logger.error(f"未知的通知渠道类型: {channel_type}")

@@ -142,7 +142,15 @@ async def send_alert_notifications(
             try:
                 notifier = create_channel(channel.channel_type, channel.config)
                 if notifier:
-                    ok = notifier.send(title, content)
+                    ok = notifier.send(title, content,
+                        alert_id=alert_id,
+                        alert_type=alert_type,
+                        severity=severity,
+                        hostname=agent_hostname,
+                        agent_id=agent_id,
+                        message=message,
+                        details=details,
+                    )
                     if ok:
                         log_entry.status = "success"
                         logger.info(f"告警已转发: [{channel.name}] {alert_type}")
