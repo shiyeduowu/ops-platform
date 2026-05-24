@@ -1,97 +1,43 @@
-# Ops Platform 简体中文演示版
+# Ops Platform — 中文文档
 
-这是一个“内网 Agent + 公网控制台”的分布式运维 SaaS MVP。
+> 分布式运维监控与管理平台，Agent 仅出站通信，30 秒本地高频检测，状态翻转告警。
 
-## 本机演示
+详细文档请参阅 [README.md](README.md#中文)。
 
-启动服务端：
+## 快速开始
 
-```powershell
-cd F:\py_agent\ops-platform
-powershell -ExecutionPolicy Bypass -File .\scripts\start-server.ps1
+```bash
+# 启动服务端
+cd ops-platform/server
+pip install -r requirements.txt
+python app.py
+
+# 启动 Agent（使用控制台输出的激活码）
+cd ops-platform/agent
+pip install -r requirements.txt
+python agent.py --server http://127.0.0.1:8000 --activation-code <激活码>
+
+# 打开控制台
+# 浏览器访问 http://127.0.0.1:8000
 ```
 
-启动 Agent：
+## 功能清单
 
-```powershell
-cd F:\py_agent\ops-platform
-powershell -ExecutionPolicy Bypass -File .\scripts\start-agent.ps1 -ServerUrl http://127.0.0.1:8000 -ActivationCode OPS-DEMO
+- Agent 监控（端口、磁盘、CPU、内存、Windows 服务、Java 进程、日志采集）
+- 告警管理（5 种通知渠道：钉钉、企微、飞书、邮件、Webhook）
+- 远程运维（Shell 命令、文件分发、软件部署）
+- 压力测试（HTTP API、浏览器自动化、基础设施压测）
+- 配置管理（设备影子模式、版本化拉取）
+- 审计日志（全操作审计、租户隔离）
+
+## 生产部署
+
+```bash
+ENV=production
+JWT_SECRET_KEY=<48位随机字符串>
+DEFAULT_ADMIN_PASSWORD=<强密码>
+DEFAULT_ACTIVATION_CODE=<自定义激活码>
+DATABASE_URL=postgresql+asyncpg://user:pass@host:5432/ops_platform
+SERVER_PUBLIC_URL=https://ops.your-domain.com
+CORS_ORIGINS=https://ops.your-domain.com
 ```
-
-打开控制台：
-
-```text
-http://127.0.0.1:8000
-```
-
-默认账号：
-
-```text
-admin / admin123456
-```
-
-默认激活码：
-
-```text
-OPS-DEMO
-```
-
-Agent 本地状态页：
-
-```text
-http://127.0.0.1:17680/local/status
-```
-
-## PostgreSQL 部署
-
-如果服务器已经安装 PostgreSQL，并且 `psql` 在 PATH 中：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\create-postgres-db.ps1 `
-  -AppUser ops_user `
-  -AppPassword ops_password
-```
-
-然后启动服务端：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\start-server.ps1 `
-  -DatabaseUrl "postgresql+asyncpg://ops_user:ops_password@127.0.0.1:5432/ops_platform" `
-  -ServerPublicUrl "http://服务器IP:8000" `
-  -JwtSecretKey "请换成一串足够长的随机密钥" `
-  -AdminUsername "admin" `
-  -AdminPassword "请换成强密码" `
-  -ActivationCode "OPS-DEMO"
-```
-
-如果 `psql` 不在 PATH 中，请传入完整路径：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\create-postgres-db.ps1 `
-  -PsqlPath "C:\Program Files\PostgreSQL\16\bin\psql.exe"
-```
-
-## 客户机器安装 Agent
-
-把 `ops-platform-agent.zip` 解压到客户机器后执行：
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\start-agent.ps1 `
-  -ServerUrl "http://服务器IP:8000" `
-  -ActivationCode "OPS-DEMO"
-```
-
-Agent 只需要能主动访问服务端地址，不需要开放客户内网端口。
-
-## 重新打包
-
-```powershell
-cd F:\py_agent\ops-platform
-powershell -ExecutionPolicy Bypass -File .\scripts\package.ps1
-```
-
-输出文件：
-
-- `dist\ops-platform-server.zip`
-- `dist\ops-platform-agent.zip`
-
